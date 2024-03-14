@@ -1,8 +1,8 @@
-#InfoExtract
+# InfoExtract
 
 InfoExtract is a powerful document analysis and information extraction tool that supports multiple file formats, including PDF, TXT, and DOCX. With its user-friendly interface built using Streamlit, users can easily upload files or enter URLs to extract valuable insights from their documents.
 
-#Features
+# Features
 
 1. Multi-Format Support: InfoExtract supports PDF, TXT, and DOCX file formats, allowing users to analyze a wide range of documents.
 
