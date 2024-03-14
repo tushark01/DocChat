@@ -24,5 +24,7 @@ InfoExtract is a powerful document analysis and information extraction tool that
 
 ![image](https://github.com/tushark01/InfoExtract/assets/70583158/2e33b09b-2917-48a8-877c-8c19b3094fb0)
 
+![image](https://github.com/tushark01/InfoExtract/assets/70583158/74a591e7-c81b-40a3-80d2-5e4dd827bfba)
+
 
 
