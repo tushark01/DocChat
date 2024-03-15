@@ -8,57 +8,56 @@ from features import process_document, process_webpage, display_chat_history
 import requests
 from io import BytesIO
 
-os.environ["OPENAI_API_KEY"] = ""
-
-def extract_text(document):
-    raw_text = ""
-    if isinstance(document, PDF):
-        for page in document.pages:
-            content = page.extract_text()
-            if content:
-                raw_text += content
-    elif isinstance(document, DocxDocument):
-        for paragraph in document.paragraphs:
-            raw_text += paragraph.text
-    else:
-        raw_text = textract.process(document).decode("utf-8")
-    return raw_text
+os.environ["OPENAI_API_KEY"] = "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"
 
 def main():
-    st.set_page_config(page_title="Document Query App", page_icon=":mag:", layout="wide")
+    st.title("Document Query App")
 
+    #!Check if chat_history is not already in the session state and initialize it if needed
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    #*Allow user to choose the input method: Upload File or Enter URL
     upload_option = st.radio("Choose input method", ["Upload File", "Enter URL"])
-    chat_history = []
 
     if upload_option == "Upload File":
-        with st.sidebar:
-            file = st.file_uploader("Upload a file", type=["pdf", "txt", "docx"])
+
+        #*Provide a file uploader for the user to upload a file
+        file = st.file_uploader("Upload a file", type=["pdf", "txt", "docx"])
         if file is not None:
+
+            #!Process the uploaded file based on its type
             if file.type == "application/pdf":
-                with st.spinner("Extracting text..."):
-                    with PDF(file) as pdf:
-                        raw_text = extract_text(pdf)
-                process_document(raw_text, chat_history)
+                process_document(file, st.session_state.chat_history)
             elif file.type == "text/plain":
-                process_document(file.read().decode("utf-8"), chat_history)
+                process_document(file.read().decode("utf-8"), st.session_state.chat_history)
             elif file.type in {"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"}:
                 doc = DocxDocument(file)
-                process_document(extract_text(doc), chat_history)
-    elif upload_option == "Enter URL":
-        with st.sidebar:
-            url = st.text_input("Enter the URL")
-        if url:
-            if url.endswith(".pdf"):
-                response = requests.get(url)
-                pdf_file = BytesIO(response.content)
-                with st.spinner("Extracting text..."):
-                    with PDF(pdf_file) as pdf:
-                        raw_text = extract_text(pdf)
-                process_document(raw_text, chat_history)
-            else:
-                process_webpage(url, chat_history)
+                full_text = "\n".join([p.text for p in doc.paragraphs])
+                process_document(full_text, st.session_state.chat_history)
 
-    display_chat_history(chat_history)
+    elif upload_option == "Enter URL":
+
+        #*Get the URL entered by the user
+        url = st.text_input("Enter the URL")
+        if url:
+
+            #*Process the URL based on its extension
+            if url.endswith(".pdf"):
+                #*Send a GET request to the URL and retrieve the content
+                response = requests.get(url)
+
+                #*Store the content in a BytesIO object
+                pdf_file = BytesIO(response.content)
+
+                #*Process the PDF content using the PDF class from the pdfplumber library
+                process_document(pdf_file, st.session_state.chat_history)
+            else:
+                #*Process the webpage using the process_webpage function from the features module
+                process_webpage(url, st.session_state.chat_history)
+
+    #!Display the chat history using the display_chat_history function from the features module
+    display_chat_history(st.session_state.chat_history)
 
 if __name__ == "__main__":
     main()
