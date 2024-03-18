@@ -23,7 +23,7 @@ from readcsv import process_csv
 
 app = FastAPI()
 
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = ""
 
 # Store the vector_store object for each uploaded file or URL
 vector_stores = {}
