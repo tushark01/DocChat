@@ -16,7 +16,7 @@ from pdfplumber import PDF
 import requests
 
 from features import process_document
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = ""
 
 app = FastAPI()
 
