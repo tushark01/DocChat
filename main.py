@@ -1,63 +1,79 @@
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from pydantic import BaseModel
 import os
-import streamlit as st
-from streamlit_ace import st_ace
+from features import process_document, process_webpage, get_response
+from readcsv import process_csv
+from io import BytesIO
 from pdfplumber import PDF
 from docx import Document as DocxDocument
-import textract
-from features import process_document, process_webpage, display_chat_history
+import pandas as pd
 import requests
-from io import BytesIO
+
+app = FastAPI()
 
 os.environ["OPENAI_API_KEY"] = "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"
 
-def main():
-    st.title("Document Query App")
+# Store the vector_store object for each uploaded file or URL
+vector_stores = {}
 
-    #!Check if chat_history is not already in the session state and initialize it if needed
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+@app.post("/upload_file/")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        if file.content_type == "application/pdf":
+            pdf_bytes = await file.read()  # Read the contents of the file into a bytes object
+            pdf_file = BytesIO(pdf_bytes)  # Create a file-like object that can be read by PDF from pdfplumber
+            vector_stores[file.filename] = process_document(pdf_file)
 
-    #*Allow user to choose the input method: Upload File or Enter URL
-    upload_option = st.radio("Choose input method", ["Upload File", "Enter URL"])
+        elif file.content_type == "text/plain":
+            vector_stores[file.filename] = process_document(file.file.read().decode("utf-8"))
 
-    if upload_option == "Upload File":
+        elif file.content_type in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"]:
+            doc = DocxDocument(BytesIO(file.file.read()))
+            full_text = "\n".join([p.text for p in doc.paragraphs])
+            vector_stores[file.filename] = process_document(full_text)
 
-        #*Provide a file uploader for the user to upload a file
-        file = st.file_uploader("Upload a file", type=["pdf", "txt", "docx"])
-        if file is not None:
+        else:
+            raise HTTPException(status_code=400, detail="Invalid file type")
 
-            #!Process the uploaded file based on its type
-            if file.type == "application/pdf":
-                process_document(file, st.session_state.chat_history)
-            elif file.type == "text/plain":
-                process_document(file.read().decode("utf-8"), st.session_state.chat_history)
-            elif file.type in {"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"}:
-                doc = DocxDocument(file)
-                full_text = "\n".join([p.text for p in doc.paragraphs])
-                process_document(full_text, st.session_state.chat_history)
+        return {"message": "File processed successfully"}
+    except Exception as e:
+        return {"error": str(e)}
 
-    elif upload_option == "Enter URL":
 
-        #*Get the URL entered by the user
-        url = st.text_input("Enter the URL")
-        if url:
+@app.post("/process_csv/")
+async def process_csv_route(csv_file: UploadFile):
+    try:
+        if csv_file.content_type != "text/csv":
+            raise HTTPException(status_code=400, detail="Invalid file type")
 
-            #*Process the URL based on its extension
-            if url.endswith(".pdf"):
-                #*Send a GET request to the URL and retrieve the content
-                response = requests.get(url)
+        encodings_to_try = ['utf-8', 'latin1', 'iso-8859-1', 'cp1252']
+        for encoding in encodings_to_try:
+            try:
+                df = pd.read_csv(csv_file.file, encoding=encoding)
+                vector_stores[csv_file.filename] = process_csv(df)
+                break
+            except UnicodeDecodeError:
+                continue
 
-                #*Store the content in a BytesIO object
-                pdf_file = BytesIO(response.content)
+        return {"message": "CSV processed successfully"}
+    except Exception as e:
+        return {"error": str(e)}
 
-                #*Process the PDF content using the PDF class from the pdfplumber library
-                process_document(pdf_file, st.session_state.chat_history)
-            else:
-                #*Process the webpage using the process_webpage function from the features module
-                process_webpage(url, st.session_state.chat_history)
+@app.post("/chat/")
+async def chat(filename: str, user_query: str):
+    try:
+        # Get the vector_store object for the uploaded file or URL
+        vector_store = vector_stores.get(filename)
+        if vector_store is None:
+            raise HTTPException(status_code=400, detail="No vector store found for the given filename")
 
-    #!Display the chat history using the display_chat_history function from the features module
-    display_chat_history(st.session_state.chat_history)
+        # Call the vector_store function with the user query
+        response = vector_store(user_query)
+
+        return {"response": response}
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
-    main()
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -8,7 +8,7 @@ import requests
 from io import BytesIO
 from pdfplumber import PDF
 import textract
-from webask import get_response, get_vectorstore_from_url
+from .webask import get_response, get_vectorstore_from_url
 
 def process_document(document):
     raw_text = ""
